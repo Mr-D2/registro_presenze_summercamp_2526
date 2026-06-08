@@ -57,7 +57,7 @@ select:focus, input:focus { outline: none; border-color: var(--blue); }
   border: 1.5px solid #C5D8F8; border-radius: 9px;
   padding: 10px 14px; display: none;
   font-size: 13px; color: var(--navy); font-weight: 600;
-  align-items: center; gap: 8px; margin-top: 10px;
+  margin-top: 10px;
 }
 #docBar span { font-weight: 400; color: #555; font-size: 12px; }
 
@@ -170,6 +170,7 @@ select:focus, input:focus { outline: none; border-color: var(--blue); }
 }
 .config-note code { background: #eee; padding: 1px 5px; border-radius: 4px; font-size: 10px; }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -204,8 +205,13 @@ select:focus, input:focus { outline: none; border-color: var(--blue); }
     </div>
 
     <div id="docBar">
-      👩‍🏫 <span id="docNome"></span>
-      &nbsp;·&nbsp; <span id="docExtra" style="font-size:11px;color:#888;font-weight:400;"></span>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <span style="font-size:16px">👩‍🏫</span>
+        <label style="margin:0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#778">Docente presente oggi</label>
+        <span id="docExtra" style="font-size:11px;color:#aaa;margin-left:auto;font-weight:400;"></span>
+      </div>
+      <select id="docSelect" style="width:100%;padding:10px 12px;border:1.5px solid #C5D8F8;border-radius:9px;font-size:14px;background:#EEF5FF;color:#0D1B5E;font-weight:600;cursor:pointer;">
+      </select>
     </div>
 
     <div id="statusBanner"></div>
@@ -239,8 +245,8 @@ select:focus, input:focus { outline: none; border-color: var(--blue); }
 <script>
 // ═══════════════════════════════════════════════════════════
 // CONFIGURAZIONE SUPABASE (opzionale — lascia vuoto per usare solo localStorage)
-const SUPABASE_URL  = "";   // es: https://abcxyz.supabase.co
-const SUPABASE_ANON_KEY = "";   // chiave anon/public
+const SUPABASE_URL  = "https://gwvvhzlulwzukyahghht.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_GNgdUXi6qoIDFC5T4M6oEg_RDwn7jfK";
 // ═══════════════════════════════════════════════════════════
 
 const DATES   = [["2026-06-08", "Lun 8 giu — 🇮🇹 Italia"], ["2026-06-09", "Mar 9 giu — 🇧🇷 Brasile"], ["2026-06-10", "Mer 10 giu — 🇯🇵 Giappone"], ["2026-06-11", "Gio 11 giu — 🇺🇸 USA"], ["2026-06-12", "Ven 12 giu — 🇨🇺 Cuba"], ["2026-06-15", "Lun 15 giu — 🇰🇪 Kenya"], ["2026-06-16", "Mar 16 giu — 🇲🇽 Messico"], ["2026-06-17", "Mer 17 giu — 🇪🇬 Egitto"], ["2026-06-18", "Gio 18 giu — 🇳🇿 N.Zelanda"], ["2026-06-19", "Ven 19 giu — 🏆 World Final"]];
@@ -248,14 +254,22 @@ const ROSTER  = {"gr1": [{"nome": "De Marco Mya", "team": "TURCHESE"}, {"nome": 
 const TEACHER = {"gr1": "Marianna Di Palma", "gr2": "Gabriella Goglia", "gr3": "Roberta Di Paola", "gr4": "Nicolina Vitelli", "gr5": "Tiziana Fusco", "gr6": "Guido Bucciaglia", "gr7": "Chiara Grillo"};
 const COLORS  = {"ROSSO": "#C62828", "BLU": "#1565C0", "VERDE": "#2E7D32", "GIALLO": "#F57F17", "ARANCIO": "#E65100", "VIOLA": "#6A1B9A", "TURCHESE": "#00695C"};
 const LABELS  = {"gr1": "gr1 — 1ª Elementare", "gr2": "gr2 — 2ª Elementare", "gr3": "gr3 — 3ª Elementare", "gr4": "gr4 — 4ª Elementare", "gr5": "gr5 — 5ª Elementare", "gr6": "gr6 — 1ª Media", "gr7": "gr7 — 2ª Media"};
+const ALL_STAFF = [
+  "Marianna Di Palma","Gabriella Goglia","Roberta Di Paola","Nicolina Vitelli",
+  "Tiziana Fusco","Guido Bucciaglia","Chiara Grillo",
+  "Diana Pilla","Liberina Venditto","Sefora Andreozzi","Adolfo Frangiosa"
+];
 
 // ── Supabase init (opzionale) ───────────────────────────────
 let sb = null;
 if (SUPABASE_URL && SUPABASE_ANON_KEY) {
   try {
-    const {createClient} = window.supabase || {};
-    if (createClient) { sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY); }
-  } catch(e) { console.warn('Supabase non disponibile:', e); }
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    console.log('☁️ Supabase connesso');
+  } catch(e) {
+    console.warn('Supabase non disponibile:', e);
+    sb = null;
+  }
 }
 
 // ── DOM refs ────────────────────────────────────────────────
@@ -312,10 +326,22 @@ function render() {
   const classe = selClasse.value;
 
   // docente bar
+  const docSel = document.getElementById('docSelect');
   if (classe && TEACHER[classe]) {
-    docNome.textContent = TEACHER[classe];
     docExtra.textContent = classe.toUpperCase() + ' · ' + (ROSTER[classe]||[]).length + ' alunni';
-    docBar.style.display = 'flex';
+    docBar.style.display = 'block';
+    // Rebuild options, preserving current selection if set
+    const prevVal = docSel.value;
+    docSel.innerHTML = '';
+    const defaultDoc = TEACHER[classe];
+    ALL_STAFF.forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name + (name === defaultDoc ? ' ✦ (docente di classe)' : '');
+      docSel.appendChild(opt);
+    });
+    // restore previous or set default
+    docSel.value = (prevVal && ALL_STAFF.includes(prevVal)) ? prevVal : defaultDoc;
   } else {
     docBar.style.display = 'none';
   }
@@ -466,7 +492,8 @@ saveBtn.addEventListener('click', async () => {
     saveBtn.disabled = true;
     saveBtn.textContent = 'Salvando…';
     try {
-      const teacher = TEACHER[classe] || '';
+      const docSel2 = document.getElementById('docSelect');
+  const teacher = (docSel2 && docSel2.value) ? docSel2.value : (TEACHER[classe] || '');
       const rows = Object.entries(state).map(([nome, v]) => ({
         data, classe, alunno: nome, docente: teacher,
         status: v.status || '',
@@ -507,9 +534,6 @@ if (matchToday) selData.value = today;
 
 render();
 </script>
-
-<!-- Supabase SDK (needed only if SUPABASE_URL is set) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
 
 </body>
 </html>
